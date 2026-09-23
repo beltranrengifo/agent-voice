@@ -1,5 +1,6 @@
 /**
- * OpenCode adapter — targets the v2 plugin API (@opencode/plugin 2.x).
+ * OpenCode adapter — typed mirror of opencode.js, which is what actually ships.
+ * Kept for type-checking against @opencode/plugin 2.x; edit both together.
  *
  * Install globally:
  *   mkdir -p ~/.config/opencode/plugin

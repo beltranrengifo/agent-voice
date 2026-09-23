@@ -1,5 +1,6 @@
 """Shared helpers for agent-voice: config, transcript parsing, text cleaning."""
 
+import hashlib
 import json
 import os
 import re
@@ -10,6 +11,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
 
 def _default_home():
     """Where models and config live.
@@ -315,6 +317,28 @@ def installed_voices():
     return sorted(p.stem for p in VOICES_DIR.glob("*.onnx"))
 
 
+DEDUPE_WINDOW = 8.0  # seconds
+
+
+def _is_repeat(clean_text):
+    """True if this exact text was already queued moments ago."""
+    stamp = RUN_DIR / "last-spoken"
+    digest = hashlib.sha256(clean_text.encode()).hexdigest()
+    now = time.time()
+    try:
+        prev_digest, prev_time = stamp.read_text().split(None, 1)
+        if prev_digest == digest and now - float(prev_time) < DEDUPE_WINDOW:
+            return True
+    except Exception:
+        pass
+    try:
+        RUN_DIR.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(f"{digest} {now}")
+    except Exception:
+        pass
+    return False
+
+
 def speak_async(text, cfg=None, max_chars=None):
     """Clean `text` and play it in a detached process. Returns a reason string
     if nothing was spoken, or None on success.
@@ -332,6 +356,12 @@ def speak_async(text, cfg=None, max_chars=None):
     clean = clean_for_speech(text, max_chars or int(cfg.get("max_chars", 1200)))
     if len(clean) < 2:
         return "nothing speakable left after cleaning"
+
+    # A host may deliver the same answer twice — OpenCode loads the plugin once
+    # per entrypoint, so both copies ask for the same text. Speaking it twice,
+    # with the second cutting off the first, is worse than dropping the repeat.
+    if _is_repeat(clean):
+        return "duplicate request, already speaking this"
 
     lang = detect_lang(clean)
     voice = cfg.get("voice_en" if lang == "en" else "voice_es")

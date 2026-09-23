@@ -76,6 +76,22 @@ export default {
     const controller = new AbortController()
     // Assistant prose per session, accumulated as it streams in.
     const buffers = new Map()
+    const timers = new Map()
+
+    /** Speak a session's buffer once the answer has stopped growing. */
+    function schedule(sessionID) {
+      if (!sessionID) return
+      clearTimeout(timers.get(sessionID))
+      timers.set(
+        sessionID,
+        setTimeout(() => {
+          timers.delete(sessionID)
+          const text = buffers.get(sessionID)
+          buffers.delete(sessionID)
+          if (text && text.trim()) speak(text)
+        }, QUIET_MS),
+      )
+    }
 
     // /voice — same subcommands as the CLI (stop, pause, on, off, speed...).
     try {
@@ -102,14 +118,19 @@ export default {
         for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
           if (event.type === "session.text.delta") {
             const { sessionID, delta } = event.data
-            if (delta) buffers.set(sessionID, (buffers.get(sessionID) ?? "") + delta)
+            if (delta) {
+              buffers.set(sessionID, (buffers.get(sessionID) ?? "") + delta)
+              clearTimeout(timers.get(sessionID))
+              timers.delete(sessionID)
+            }
             continue
           }
-          if (event.type === "session.idle") {
-            const { sessionID } = event.data
-            const text = buffers.get(sessionID)
-            buffers.delete(sessionID)
-            if (text && text.trim()) speak(text)
+          if (END_EVENTS.has(event.type)) {
+            // A turn that uses tools ends several executions, each of which
+            // would otherwise speak its own fragment and cut off the previous
+            // one, leaving only the last paragraph audible. Wait for the
+            // stream to go quiet instead, then read the whole answer once.
+            schedule(event.data?.sessionID)
           }
         }
       } catch {
@@ -119,6 +140,8 @@ export default {
 
     return () => {
       controller.abort()
+      for (const t of timers.values()) clearTimeout(t)
+      timers.clear()
       buffers.clear()
     }
   },
