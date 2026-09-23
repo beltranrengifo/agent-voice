@@ -60,6 +60,21 @@ claude plugin marketplace add beltranrengifo/agent-voice
 claude plugin install agent-voice@agent-voice
 ```
 
+If answers are never spoken, check `/hooks`. Some builds list a plugin's hooks
+without running them; in that case declare them in `~/.claude/settings.json`
+instead, pointing at the installed plugin directory:
+
+```json
+{
+  "hooks": {
+    "Stop": [{ "hooks": [{ "type": "command",
+      "command": "python3 \"$HOME/.claude/plugins/cache/agent-voice/agent-voice/<version>/adapters/claude-code.py\"" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command",
+      "command": "sh \"$HOME/.claude/plugins/cache/agent-voice/agent-voice/<version>/scripts/hush.sh\"" }] }]
+  }
+}
+```
+
 Restart Claude Code, then run the one-time setup, which builds a virtualenv,
 installs Piper and downloads the default voices (about 170 MB):
 

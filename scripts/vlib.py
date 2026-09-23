@@ -38,7 +38,7 @@ PID_FILE = RUN_DIR / "current.pid"
 PIPER = HOME / "venv" / "bin" / "python"
 
 DEFAULTS = {
-    "enabled": True,
+    "enabled": False,      # opt in with `voice on`; nobody wants a surprise voice
     "paused_until": 0,      # 0 = active, -1 = paused indefinitely, >0 = epoch to resume
     "voice_es": "es_ES-sharvard-medium",
     "voice_en": "en_US-lessac-high",
@@ -69,7 +69,7 @@ def save_config(cfg):
 
 def is_silenced(cfg):
     """Return a reason string if we should stay quiet, else None."""
-    if not cfg.get("enabled", True):
+    if not cfg.get("enabled", False):
         return "disabled"
     pu = cfg.get("paused_until", 0)
     if pu == -1:

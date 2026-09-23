@@ -131,6 +131,7 @@ def setup(args):
     log.append(f"Voices installed: {', '.join(vlib.installed_voices())}")
 
     cfg = vlib.load_config()
+    cfg["enabled"] = True   # running setup is an explicit request for speech
     for lang, prefix in (("es", "es_"), ("en", "en_")):
         if not vlib.voice_path(cfg[f"voice_{lang}"]).exists():
             match = next((v for v in vlib.installed_voices() if v.startswith(prefix)), None)
