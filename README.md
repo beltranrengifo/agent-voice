@@ -30,7 +30,7 @@ loading included. No background daemon is needed.
 ## Install
 
 ```sh
-claude plugin marketplace add belt/claude-voice
+claude plugin marketplace add beltranrengifo/claude-voice
 claude plugin install claude-voice@claude-voice
 ```
 
