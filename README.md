@@ -43,7 +43,7 @@ pipes it into `voice speak`. Nothing else changes.
 | --- | --- | --- |
 | Claude Code | `Stop` hook | No — the adapter reads the session transcript |
 | Codex | `notify` in `config.toml` | Yes, in `last-assistant-message` |
-| OpenCode | plugin, `session.idle` event | No — the adapter asks the client |
+| OpenCode | plugin, `session.text.delta` + `session.idle` | No — the adapter accumulates the stream |
 | Anything else | pipe into `voice speak` | You decide |
 
 ## Requirements
@@ -85,12 +85,17 @@ ln -sf ~/.agent-voice/scripts/voicectl.py ~/.local/bin/voice   # optional but ha
 notify = ["python3", "/Users/YOU/.agent-voice/adapters/codex.py"]
 ```
 
-**OpenCode** — copy the plugin into place:
+**OpenCode** (v2) — copy the plugin into place:
 
 ```sh
 mkdir -p ~/.config/opencode/plugin
-cp ~/.agent-voice/adapters/opencode.ts ~/.config/opencode/plugin/
+cp ~/.agent-voice/adapters/opencode.ts ~/.config/opencode/plugin/agent-voice.ts
 ```
+
+The adapter targets the v2 plugin API (`@opencode/plugin` 2.x — note the scope,
+which differs from the v1 `@opencode-ai/plugin`). v2 gives plugins no way to
+read a session's message history, so the adapter accumulates the
+`session.text.delta` stream and speaks it when the session goes idle.
 
 **Any other agent** — if it can run a command at end of turn, pipe the text in:
 
@@ -183,8 +188,10 @@ Add a `"player"` key if audio player autodetection guesses wrong, for example
   the wrong voice.
 - Voice models are not in this repo; `voice setup` downloads them from
   Hugging Face.
-- The OpenCode adapter is written against the documented plugin API but has not
-  been exercised as thoroughly as the Claude Code and Codex ones.
+- The OpenCode adapter type-checks against `@opencode/plugin` 2.0.15 and its
+  event shapes are taken from that package, but it has not yet been run against
+  a live session — unlike the Claude Code and Codex adapters, which have.
+- OpenCode v1 is not supported; its plugin API differs entirely.
 
 ## License
 
