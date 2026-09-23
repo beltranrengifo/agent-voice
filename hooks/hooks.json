@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/speak.py\"",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/adapters/claude-code.py\"",
             "timeout": 10
           }
         ]

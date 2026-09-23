@@ -1,14 +1,34 @@
-"""Shared helpers for claude-voice: config, transcript parsing, text cleaning."""
+"""Shared helpers for agent-voice: config, transcript parsing, text cleaning."""
 
 import json
 import os
 import re
 import shutil
 import signal
+import subprocess
+import sys
+import tempfile
 import time
 from pathlib import Path
 
-HOME = Path(os.environ.get("CLAUDE_VOICE_HOME", Path.home() / ".claude" / "voice"))
+def _default_home():
+    """Where models and config live.
+
+    VOICE_HOME wins. CLAUDE_VOICE_HOME is still honoured for installs that
+    predate multi-agent support, as is an existing ~/.claude/voice directory —
+    nobody should have to re-download 170 MB of models because the tool grew
+    beyond Claude Code.
+    """
+    for var in ("VOICE_HOME", "CLAUDE_VOICE_HOME"):
+        if os.environ.get(var):
+            return Path(os.environ[var])
+    legacy = Path.home() / ".claude" / "voice"
+    if legacy.is_dir():
+        return legacy
+    return Path.home() / ".config" / "agent-voice"
+
+
+HOME = _default_home()
 CONFIG_PATH = HOME / "config.json"
 VOICES_DIR = HOME / "voices"
 RUN_DIR = HOME / "run"
@@ -293,6 +313,91 @@ def installed_voices():
     if not VOICES_DIR.is_dir():
         return []
     return sorted(p.stem for p in VOICES_DIR.glob("*.onnx"))
+
+
+def speak_async(text, cfg=None, max_chars=None):
+    """Clean `text` and play it in a detached process. Returns a reason string
+    if nothing was spoken, or None on success.
+
+    This is the one entry point every agent adapter uses: Claude Code, Codex,
+    OpenCode and anything else that can pipe its final message into `voice
+    speak`. Adapters only have to extract the text; everything after that —
+    silencing rules, cleaning, voice choice, playback — happens here.
+    """
+    cfg = cfg or load_config()
+    reason = is_silenced(cfg)
+    if reason:
+        return reason
+
+    clean = clean_for_speech(text, max_chars or int(cfg.get("max_chars", 1200)))
+    if len(clean) < 2:
+        return "nothing speakable left after cleaning"
+
+    lang = detect_lang(clean)
+    voice = cfg.get("voice_en" if lang == "en" else "voice_es")
+    speaker = cfg.get("speaker_en" if lang == "en" else "speaker_es", 0)
+    if not voice_path(voice).exists():
+        return f"voice model missing: {voice} (run: voice setup)"
+    if find_player() is None:
+        return "no audio player found"
+
+    stop_playback()  # whatever is playing is now stale
+
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(RUN_DIR), suffix=".json")
+    with os.fdopen(fd, "w") as fh:
+        json.dump({"text": clean, "cfg": cfg, "voice": voice, "speaker": speaker}, fh)
+
+    worker = Path(__file__).resolve().parent / "voicectl.py"
+    subprocess.Popen(
+        [sys.executable, str(worker), "--worker", tmp],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL, start_new_session=True,
+    )
+    return None
+
+
+def run_worker(text_file):
+    """Detached: synthesize the queued payload and play it to completion."""
+    try:
+        if os.getpid() != os.getsid(0):
+            os.setsid()
+    except OSError:
+        pass
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    PID_FILE.write_text(str(os.getpid()))
+    try:
+        payload = json.loads(Path(text_file).read_text())
+        wav = RUN_DIR / "out.wav"
+        cmd = piper_cmd(payload["voice"], payload["cfg"], wav,
+                        payload.get("speaker", 0))
+        proc = subprocess.run(
+            cmd, input=payload["text"].encode(),
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        )
+        if proc.returncode != 0 or not wav.exists():
+            (RUN_DIR / "last-error.log").write_bytes(proc.stderr[-4000:])
+            return
+        player = find_player()
+        if not player:
+            (RUN_DIR / "last-error.log").write_text("No audio player found.")
+            return
+        subprocess.run(player + [str(wav)])
+    except Exception as exc:
+        try:
+            (RUN_DIR / "last-error.log").write_text(repr(exc))
+        except Exception:
+            pass
+    finally:
+        try:
+            Path(text_file).unlink()
+        except Exception:
+            pass
+        try:
+            if PID_FILE.read_text().strip() == str(os.getpid()):
+                PID_FILE.unlink()
+        except Exception:
+            pass
 
 
 def find_player():

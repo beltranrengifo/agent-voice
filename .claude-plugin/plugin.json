@@ -1,9 +1,16 @@
 {
-  "name": "claude-voice",
-  "description": "Reads Claude Code's answers aloud using Piper — fully local, offline and free. Skips code blocks, picks a Spanish or English voice automatically.",
-  "version": "0.3.0",
+  "name": "agent-voice",
+  "description": "Your coding agent reads its answers aloud — local, offline and free, via Piper. Skips code, picks a Spanish or English voice automatically.",
+  "version": "0.4.0",
   "author": {
     "name": "beltranrengifo"
   },
-  "keywords": ["tts", "voice", "accessibility", "piper", "offline"]
+  "keywords": [
+    "tts",
+    "voice",
+    "accessibility",
+    "piper",
+    "offline",
+    "agent"
+  ]
 }

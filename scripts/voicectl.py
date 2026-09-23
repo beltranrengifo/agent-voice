@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""claude-voice control CLI.
+"""agent-voice control CLI.
 
 Usable both as the backend for the /voice slash command and directly from a
 shell (`voice stop`) when you need to cut playback without waiting a turn.
@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import vlib  # noqa: E402
 
-USAGE = """claude-voice — reads Claude Code answers aloud with Piper (local, offline)
+USAGE = """agent-voice — your coding agent reads its answers aloud (Piper, local, offline)
 
   voice setup [NAME...]    one-time install: virtualenv, Piper, and voice models
   voice doctor             diagnose a broken setup
@@ -73,7 +73,7 @@ def status(cfg):
     else:
         state = fmt_remaining(cfg) or "ON (speaking)"
     lines = [
-        f"claude-voice: {state}",
+        f"agent-voice: {state}",
         f"  Spanish voice : {describe(cfg, 'es')}",
         f"  English voice : {describe(cfg, 'en')}",
         f"  speed         : {cfg['speed']}   volume: {cfg['volume']}   max chars: {cfg['max_chars']}",
@@ -152,7 +152,7 @@ def setup(args):
 
 def doctor():
     ok, problems = vlib.is_ready()
-    lines = ["claude-voice doctor", ""]
+    lines = ["agent-voice doctor", ""]
     lines.append(f"  home          : {vlib.HOME}")
     lines.append(f"  piper python  : {vlib.PIPER} {'OK' if vlib.PIPER.exists() else 'MISSING'}")
     lines.append(f"  voices dir    : {vlib.VOICES_DIR} ({len(vlib.installed_voices())} installed)")
@@ -230,6 +230,13 @@ def main(argv):
 
     if cmd in ("-h", "--help", "help"):
         return USAGE + "\n" + status(cfg)
+
+    if cmd == "speak":
+        # The portable entry point: any agent that can pipe its final message
+        # into this speaks through the same pipeline Claude Code uses.
+        text = " ".join(args) if args else sys.stdin.read()
+        reason = vlib.speak_async(text, cfg)
+        return f"Not spoken: {reason}" if reason else "Speaking."
 
     if cmd == "setup":
         return setup(args)
@@ -388,4 +395,8 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    print(main(sys.argv[1:]))
+    # Detached playback child, spawned by vlib.speak_async().
+    if len(sys.argv) > 2 and sys.argv[1] == "--worker":
+        vlib.run_worker(sys.argv[2])
+    else:
+        print(main(sys.argv[1:]))

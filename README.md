@@ -1,26 +1,50 @@
-# claude-voice
+# agent-voice
 
-Claude Code reads its answers out loud in your terminal.
+Your coding agent reads its answers out loud in the terminal.
 
 Speech is synthesized locally with [Piper](https://github.com/OHF-Voice/piper1-gpl):
 nothing leaves your machine, it works offline, and there is no API bill. It
 picks a Spanish or English voice automatically based on what the answer is
 written in, and it does not read code out loud.
 
+Works with Claude Code, Codex and OpenCode — and with anything else that can
+run a command when it finishes a turn.
+
 ## What it actually does
 
-A `Stop` hook fires when Claude finishes a turn. It reads the last prose from
-the session transcript, strips everything unpleasant to hear, and hands the
-result to a detached worker that synthesizes and plays it — so the hook returns
-in milliseconds and never blocks your terminal.
+When your agent finishes a turn, a small adapter grabs the text it just wrote,
+strips everything unpleasant to hear, and hands it to a detached worker that
+synthesizes and plays it. The adapter returns in milliseconds and never blocks
+your terminal.
 
 What gets stripped: fenced code blocks, inline code, markdown tables, URLs and
 file paths. Sentences that lose too much to that stripping are dropped entirely
 rather than read as fragments — "the check uses instead of , see the file line
 42" is worse than silence.
 
-On a 2024 MacBook, 6.6 seconds of audio takes about 1 second to generate, model
+On an M-series Mac, 6.6 seconds of audio takes about 1 second to generate, model
 loading included. No background daemon is needed.
+
+## Architecture
+
+One engine, thin adapters. Everything agent-specific lives in `adapters/` and is
+about twenty lines; the pipeline underneath is shared.
+
+```
+adapters/claude-code.py ─┐
+adapters/codex.py        ├─→ voice speak ─→ clean ─→ Piper ─→ player
+adapters/opencode.ts     ─┘
+```
+
+Adding an agent means writing one adapter that extracts the final message and
+pipes it into `voice speak`. Nothing else changes.
+
+| Agent | Mechanism | Gives you the text? |
+| --- | --- | --- |
+| Claude Code | `Stop` hook | No — the adapter reads the session transcript |
+| Codex | `notify` in `config.toml` | Yes, in `last-assistant-message` |
+| OpenCode | plugin, `session.idle` event | No — the adapter asks the client |
+| Anything else | pipe into `voice speak` | You decide |
 
 ## Requirements
 
@@ -29,58 +53,86 @@ loading included. No background daemon is needed.
 
 ## Install
 
+### Claude Code
+
 ```sh
-claude plugin marketplace add beltranrengifo/claude-voice
-claude plugin install claude-voice@claude-voice
+claude plugin marketplace add beltranrengifo/agent-voice
+claude plugin install agent-voice@agent-voice
 ```
 
-Restart Claude Code, then run the one-time setup, which creates a virtualenv,
-installs Piper and downloads the default voices (about 170 MB) into
-`~/.claude/voice`:
+Restart Claude Code, then run the one-time setup, which builds a virtualenv,
+installs Piper and downloads the default voices (about 170 MB):
 
 ```
 /voice setup
 ```
 
-That is all. The next answer Claude gives will be spoken.
+That is all. The next answer will be spoken.
 
-### Optional: the shell CLI
+### Codex, OpenCode, or anything else
 
-Everything is reachable through `/voice` inside Claude Code. If you also want it
-from a plain shell, link the script onto your `PATH`:
+Clone the repo and run setup once:
 
 ```sh
-ln -sf ~/.claude/plugins/cache/claude-voice/claude-voice/*/scripts/voicectl.py ~/.local/bin/voice
+git clone https://github.com/beltranrengifo/agent-voice.git ~/.agent-voice
+~/.agent-voice/scripts/voicectl.py setup
+ln -sf ~/.agent-voice/scripts/voicectl.py ~/.local/bin/voice   # optional but handy
 ```
+
+**Codex** — add to `~/.codex/config.toml`:
+
+```toml
+notify = ["python3", "/Users/YOU/.agent-voice/adapters/codex.py"]
+```
+
+**OpenCode** — copy the plugin into place:
+
+```sh
+mkdir -p ~/.config/opencode/plugin
+cp ~/.agent-voice/adapters/opencode.ts ~/.config/opencode/plugin/
+```
+
+**Any other agent** — if it can run a command at end of turn, pipe the text in:
+
+```sh
+echo "$FINAL_MESSAGE" | voice speak
+```
+
+`voice speak` reads stdin, applies the same cleaning and voice selection, and
+plays without blocking. That is the whole integration contract.
 
 ## Usage
 
+Inside Claude Code use `/voice`; anywhere else use the `voice` CLI. Same
+commands either way.
+
 | Command | Effect |
 | --- | --- |
-| `/voice` | Show current status |
-| `/voice stop` | Cut the audio playing right now |
-| `/voice pause [20m]` | Stay enabled but keep quiet; bare form lasts until `resume` |
-| `/voice resume` | Start speaking again |
-| `/voice on` / `/voice off` | Enable or disable persistently |
-| `/voice es NAME [SPEAKER]` | Set the Spanish voice |
-| `/voice en NAME [SPEAKER]` | Set the English voice |
-| `/voice speaker [es\|en] ID` | Pick the speaker on a multi-speaker model |
-| `/voice try NAME [ID]` | Audition a voice without changing settings |
-| `/voice speed N` | Speaking rate (1.0 normal, 1.2 faster) |
-| `/voice volume N` | Volume multiplier |
-| `/voice max N` | Max characters spoken per answer |
-| `/voice voices` | List installed voices |
-| `/voice install NAME...` | Download more voices |
-| `/voice test [TEXT]` | Speak a sample |
-| `/voice setup` | One-time install |
-| `/voice doctor` | Diagnose a broken setup |
+| `voice` | Show current status |
+| `voice stop` | Cut the audio playing right now |
+| `voice pause [20m]` | Stay enabled but keep quiet; bare form lasts until `resume` |
+| `voice resume` | Start speaking again |
+| `voice on` / `voice off` | Enable or disable persistently |
+| `voice es NAME [SPEAKER]` | Set the Spanish voice |
+| `voice en NAME [SPEAKER]` | Set the English voice |
+| `voice speaker [es\|en] ID` | Pick the speaker on a multi-speaker model |
+| `voice try NAME [ID]` | Audition a voice without changing settings |
+| `voice speed N` | Speaking rate (1.0 normal, 1.2 faster) |
+| `voice volume N` | Volume multiplier |
+| `voice max N` | Max characters spoken per answer |
+| `voice voices` | List installed voices |
+| `voice install NAME...` | Download more voices |
+| `voice speak` | Speak text from stdin — the portable entry point |
+| `voice test [TEXT]` | Speak a sample |
+| `voice setup` | One-time install |
+| `voice doctor` | Diagnose a broken setup |
 
-`off` and `pause` differ on purpose: `off` disables the plugin until you turn it
-back on, `pause` keeps it armed but silent, optionally for a fixed period.
+`off` and `pause` differ on purpose: `off` disables it until you turn it back
+on, `pause` keeps it armed but silent, optionally for a fixed period.
 
-Sending any message also cuts playback immediately, via a `UserPromptSubmit`
-hook — so you rarely need `/voice stop` at all. There is no push-to-talk
-interruption: you cannot cut the voice by speaking, only by typing.
+In Claude Code, sending any message also cuts playback immediately via a
+`UserPromptSubmit` hook, so you rarely need `/voice stop`. There is no barge-in
+on any agent: you cannot cut the voice by speaking, only by typing.
 
 ## Choosing a voice
 
@@ -88,23 +140,26 @@ Browse and listen at <https://rhasspy.github.io/piper-samples/>, then install by
 name:
 
 ```
-/voice install es_MX-claude-high
-/voice es es_MX-claude-high
+voice install es_MX-claude-high
+voice es es_MX-claude-high
 ```
 
 Some models hold several speakers. `es_ES-sharvard-medium` has `M=0` and `F=1`,
-selected with `/voice speaker es F`.
+selected with `voice speaker es F`.
 
 Worth knowing before you pick: `es_ES` has no `high`-quality model, its ceiling
-is `medium`. The `high` Spanish voices are Latin American
-(`es_MX-claude-high`) or Argentine (`es_AR-daniela-high`), so you are choosing
-between a peninsular accent at medium quality and a Latin American one at high.
+is `medium`. The `high` Spanish voices are Latin American (`es_MX-claude-high`)
+or Argentine (`es_AR-daniela-high`), so you are choosing between a peninsular
+accent at medium quality and a Latin American one at high.
 
 ## Configuration
 
-State lives in `~/.claude/voice/config.json` and persists across sessions.
-Editing it by hand works; the CLI is a safer front end. Set `CLAUDE_VOICE_HOME`
-to move the whole thing elsewhere.
+State lives in `config.json` under the data directory and persists across
+sessions and across agents — configure once, every agent obeys it.
+
+The data directory is `$VOICE_HOME` if set, otherwise `~/.claude/voice` when it
+already exists (so older installs keep working), otherwise
+`~/.config/agent-voice`.
 
 ```json
 {
@@ -117,8 +172,8 @@ to move the whole thing elsewhere.
 }
 ```
 
-Add a `"player"` key if the audio player autodetection guesses wrong, for
-example `"player": "ffplay -nodisp -autoexit -loglevel quiet"`.
+Add a `"player"` key if audio player autodetection guesses wrong, for example
+`"player": "ffplay -nodisp -autoexit -loglevel quiet"`.
 
 ## Limitations
 
@@ -126,8 +181,10 @@ example `"player": "ffplay -nodisp -autoexit -loglevel quiet"`.
 - Only Spanish and English are detected; other languages fall back to Spanish.
 - Detection is a stopword vote, so a short answer mixing both languages can pick
   the wrong voice.
-- Voice models are not in this repo. `/voice setup` downloads them from
+- Voice models are not in this repo; `voice setup` downloads them from
   Hugging Face.
+- The OpenCode adapter is written against the documented plugin API but has not
+  been exercised as thoroughly as the Claude Code and Codex ones.
 
 ## License
 

@@ -1,13 +1,13 @@
 {
-  "name": "claude-voice",
+  "name": "agent-voice",
   "owner": {
     "name": "beltranrengifo"
   },
   "plugins": [
     {
-      "name": "claude-voice",
+      "name": "agent-voice",
       "source": "./",
-      "description": "Reads Claude Code's answers aloud with Piper — local, offline, free."
+      "description": "Your coding agent reads its answers aloud with Piper — local, offline, free."
     }
   ]
 }
