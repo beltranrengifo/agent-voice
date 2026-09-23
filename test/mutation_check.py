@@ -60,6 +60,12 @@ MUTATIONS = [
         "        pass",
     ),
     (
+        "a default change silences an existing install",
+        "scripts/vlib.py",
+        '    if "enabled" not in stored:\n        cfg["enabled"] = True',
+        "    pass",
+    ),
+    (
         "Codex answers are dropped",
         "adapters/codex.py",
         '    text = event.get("last-assistant-message") or event.get("last_assistant_message")',

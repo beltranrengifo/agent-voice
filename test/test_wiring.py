@@ -108,6 +108,29 @@ class WiringTest(unittest.TestCase):
         self.inst.run_hook(payload)
         self.assertEqual(len(self.inst.utterances), 1)
 
+    # -- Config defaults -----------------------------------------------------
+
+    def test_a_default_change_cannot_silence_an_existing_install(self):
+        """An install predating opt-in keeps speaking; only a fresh one is mute."""
+        import json
+        cfg_path = self.inst.dir / "config.json"
+        stored = json.loads(cfg_path.read_text())
+        stored.pop("enabled", None)          # as written before opt-in existed
+        cfg_path.write_text(json.dumps(stored))
+
+        t = self.inst.transcript([user(), assistant("Debe seguir sonando tras el cambio.")])
+        self.inst.run_hook({"transcript_path": t, "stop_hook_active": False})
+        self.assertTrue(
+            self.inst.utterances,
+            "changing the default silenced an install that was already working",
+        )
+
+    def test_a_fresh_install_stays_quiet(self):
+        (self.inst.dir / "config.json").unlink()
+        t = self.inst.transcript([user(), assistant("Nadie pidio que esto sonara.")])
+        self.inst.run_hook({"transcript_path": t, "stop_hook_active": False})
+        self.assertEqual(self.inst.utterances, [], "a fresh install should not speak unasked")
+
     # -- The portable entry point -------------------------------------------
 
     def test_speak_reads_stdin(self):

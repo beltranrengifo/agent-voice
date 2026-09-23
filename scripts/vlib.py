@@ -52,11 +52,22 @@ DEFAULTS = {
 
 
 def load_config():
+    """Read the stored config over the defaults.
+
+    `enabled` defaults to False so a fresh install never starts talking on its
+    own. But that default must not reach an install that already exists: when a
+    config file is present without the key, the setting predates opt-in and
+    silently disabling it would look exactly like the tool breaking — which is
+    how it was found.
+    """
     cfg = dict(DEFAULTS)
     try:
-        cfg.update(json.loads(CONFIG_PATH.read_text()))
+        stored = json.loads(CONFIG_PATH.read_text())
     except Exception:
-        pass
+        return cfg
+    if "enabled" not in stored:
+        cfg["enabled"] = True
+    cfg.update(stored)
     return cfg
 
 
