@@ -223,6 +223,22 @@ cat "${VOICE_HOME:-$HOME/.config/agent-voice}/run/config-changes.log"
 
 Then `voice doctor` for a missing model, virtualenv or audio player.
 
+## Privacy and security
+
+Nothing is sent anywhere. Synthesis is local, the process opens no port and
+listens on nothing, and the only network access is when you run `voice setup`
+or `voice install`, which fetch from PyPI and Hugging Face.
+
+It does read your assistant's answers, so treat its data directory as private:
+it is created `0700`, queued text lives there only until it is spoken, and the
+audio is deleted after playback. Leftovers from a run cut short are swept after
+fifteen minutes. What stays is metadata — a change log and a hash — not
+conversation text.
+
+Installing a plugin runs its code on your machine, here and with any other
+plugin. Pin a version you have read if that matters to you, rather than
+tracking a branch.
+
 ## Limitations
 
 - One-way. No barge-in: you cannot interrupt by speaking.

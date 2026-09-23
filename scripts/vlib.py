@@ -77,6 +77,40 @@ def load_config():
     return cfg
 
 
+def _private_run_dir():
+    """Create RUN_DIR readable only by its owner.
+
+    Everything in here is derived from the conversation — the text queued for
+    synthesis and the audio itself — so it must not be world-readable on a
+    shared machine.
+    """
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        RUN_DIR.chmod(0o700)
+    except Exception:
+        pass
+    return RUN_DIR
+
+
+def sweep_stale(max_age=900):
+    """Delete leftovers from workers that were killed mid-sentence.
+
+    A worker that is stopped never reaches its cleanup, so its queued text and
+    audio stay on disk indefinitely.
+    """
+    import time as _t
+    if not RUN_DIR.is_dir():
+        return
+    cutoff = _t.time() - max_age
+    for pattern in ("tmp*.json", "out-*.wav", "*.wav"):
+        for f in RUN_DIR.glob(pattern):
+            try:
+                if f.stat().st_mtime < cutoff:
+                    f.unlink()
+            except Exception:
+                pass
+
+
 def save_config(cfg):
     """Persist the config, recording who changed what.
 
@@ -431,7 +465,8 @@ def speak_async(text, cfg=None, max_chars=None, session=None):
 
     stop_playback(session)  # this session's previous answer is now stale
 
-    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    _private_run_dir()
+    sweep_stale()
     fd, tmp = tempfile.mkstemp(dir=str(RUN_DIR), suffix=".json")
     with os.fdopen(fd, "w") as fh:
         json.dump({"text": clean, "cfg": cfg, "voice": voice,
@@ -453,7 +488,7 @@ def run_worker(text_file):
             os.setsid()
     except OSError:
         pass
-    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    _private_run_dir()
     marker = PID_FILE
     try:
         payload = json.loads(Path(text_file).read_text())
@@ -475,7 +510,15 @@ def run_worker(text_file):
         if not player:
             (RUN_DIR / "last-error.log").write_text("No audio player found.")
             return
+        try:
+            wav.chmod(0o600)
+        except Exception:
+            pass
         subprocess.run(player + [str(wav)])
+        try:
+            wav.unlink()   # spoken and done; no reason to leave it lying around
+        except Exception:
+            pass
     except Exception as exc:
         try:
             (RUN_DIR / "last-error.log").write_text(repr(exc))
