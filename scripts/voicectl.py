@@ -193,7 +193,7 @@ def speak_now(cfg, text, voice=None, speaker=None):
         speaker = cfg.get("speaker_en" if lang == "en" else "speaker_es", 0)
     if not vlib.voice_path(voice).exists():
         return f"Voice file missing: {voice}. Run: voice install {voice}"
-    vlib.stop_playback()
+    vlib.stop_playback(everywhere=True)
     vlib.RUN_DIR.mkdir(parents=True, exist_ok=True)
     wav = vlib.RUN_DIR / "test.wav"
     proc = subprocess.run(
@@ -235,8 +235,12 @@ def main(argv):
     if cmd == "speak":
         # The portable entry point: any agent that can pipe its final message
         # into this speaks through the same pipeline Claude Code uses.
+        session = None
+        if args and args[0] == "--session":
+            session = args[1] if len(args) > 1 else None
+            args = args[2:]
         text = " ".join(args) if args else sys.stdin.read()
-        reason = vlib.speak_async(text, cfg)
+        reason = vlib.speak_async(text, cfg, session=session)
         return f"Not spoken: {reason}" if reason else "Speaking."
 
     if cmd == "setup":
@@ -262,7 +266,7 @@ def main(argv):
     if cmd == "off":
         cfg["enabled"] = False
         vlib.save_config(cfg)
-        vlib.stop_playback()
+        vlib.stop_playback(everywhere=True)
         return status(cfg)
 
     if cmd == "pause":
@@ -274,7 +278,7 @@ def main(argv):
         else:
             cfg["paused_until"] = -1
         vlib.save_config(cfg)
-        vlib.stop_playback()
+        vlib.stop_playback(everywhere=True)
         return status(cfg)
 
     if cmd == "resume":
@@ -284,7 +288,8 @@ def main(argv):
         return status(cfg)
 
     if cmd == "stop":
-        return "Playback stopped." if vlib.stop_playback() else "Nothing was playing."
+        # An explicit request for quiet covers every session, not just this one.
+        return "Playback stopped." if vlib.stop_playback(everywhere=True) else "Nothing was playing."
 
     if cmd in ("es", "en"):
         if not args:

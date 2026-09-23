@@ -131,6 +131,32 @@ class WiringTest(unittest.TestCase):
         self.inst.run_hook({"transcript_path": t, "stop_hook_active": False})
         self.assertEqual(self.inst.utterances, [], "a fresh install should not speak unasked")
 
+    # -- Session isolation ---------------------------------------------------
+
+    def test_one_session_does_not_cut_off_another(self):
+        """Answers in different windows must not kill each other's audio."""
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import importlib, os
+        os.environ["VOICE_HOME"] = str(self.inst.dir)
+        for m in ("vlib",):
+            if m in _sys.modules:
+                del _sys.modules[m]
+        vlib = importlib.import_module("vlib")
+
+        vlib.RUN_DIR.mkdir(parents=True, exist_ok=True)
+        a, b = vlib.pid_file("session-a"), vlib.pid_file("session-b")
+        self.assertNotEqual(a, b, "sessions share one playback marker")
+
+        a.write_text("999999")   # a PID that is not ours and does not exist
+        b.write_text("999998")
+        vlib.stop_playback("session-a")
+        self.assertFalse(a.exists(), "the session's own marker should be cleared")
+        self.assertTrue(b.exists(), "stopping one session killed another session's audio")
+
+        vlib.stop_playback(everywhere=True)
+        self.assertFalse(b.exists(), "an explicit stop should silence every session")
+
     # -- The portable entry point -------------------------------------------
 
     def test_speak_reads_stdin(self):

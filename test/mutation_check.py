@@ -20,8 +20,8 @@ MUTATIONS = [
     (
         "final answer is never read",
         "adapters/claude-code.py",
-        "    if text.strip():\n        vlib.speak_async(text)",
-        "    if False:\n        vlib.speak_async(text)",
+        '    if text.strip():\n        vlib.speak_async(text, session=hook_input.get("session_id"))',
+        "    if False:\n        pass",
     ),
     (
         "only the newest entry is read, so prose before a tool call is lost",
@@ -64,6 +64,12 @@ MUTATIONS = [
         "scripts/vlib.py",
         '    if "enabled" not in stored:\n        cfg["enabled"] = True',
         "    pass",
+    ),
+    (
+        "one session cuts off another session's audio",
+        "scripts/vlib.py",
+        "    return _kill_marker(pid_file(session))",
+        "    return any(_kill_marker(m) for m in RUN_DIR.glob('pid-*')) if RUN_DIR.is_dir() else False",
     ),
     (
         "Codex answers are dropped",

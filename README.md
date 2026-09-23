@@ -200,6 +200,17 @@ already exists (so older installs keep working), otherwise
 Add a `"player"` key if audio player autodetection guesses wrong, for example
 `"player": "ffplay -nodisp -autoexit -loglevel quiet"`.
 
+## Several sessions at once
+
+Each session speaks independently and only ever interrupts itself, so finishing
+a turn in one window will not cut off the answer you are listening to in
+another. `voice stop` is the exception: it silences every session, because that
+is what you mean by it.
+
+Install the hook in one place only. Declaring it both in the plugin and in
+`settings.json` makes every turn fire twice, and the two runs cut each other
+off.
+
 ## When it goes quiet
 
 Check `voice` first — speech being off looks exactly like the tool being

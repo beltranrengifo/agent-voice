@@ -63,7 +63,8 @@ function runVoice(args, input) {
   })
 }
 
-const speak = (text) => runVoice(["speak"], text)
+const speak = (text, sessionID) =>
+  runVoice(sessionID ? ["speak", "--session", sessionID] : ["speak"], text)
 
 /**
  * Subcommands the slash command may run. Anything unrecognised falls back to
@@ -105,7 +106,7 @@ export default {
           timers.delete(sessionID)
           const text = buffers.get(sessionID)
           buffers.delete(sessionID)
-          if (text && text.trim()) speak(text)
+          if (text && text.trim()) speak(text, sessionID)
         }, QUIET_MS),
       )
     }

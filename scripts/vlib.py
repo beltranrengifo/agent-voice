@@ -34,7 +34,13 @@ HOME = _default_home()
 CONFIG_PATH = HOME / "config.json"
 VOICES_DIR = HOME / "voices"
 RUN_DIR = HOME / "run"
-PID_FILE = RUN_DIR / "current.pid"
+PID_FILE = RUN_DIR / "current.pid"   # legacy marker, still cleared by `stop`
+
+
+def pid_file(session=None):
+    """One playback marker per session, so sessions cannot cut each other off."""
+    safe = "".join(c for c in str(session or "default") if c.isalnum() or c in "-_")[:64]
+    return RUN_DIR / f"pid-{safe or 'default'}"
 PIPER = HOME / "venv" / "bin" / "python"
 
 DEFAULTS = {
@@ -322,27 +328,41 @@ def detect_lang(text):
 # Playback process control
 # --------------------------------------------------------------------------
 
-def stop_playback():
-    """Kill any in-flight synthesis/playback. Returns True if something died."""
+def _kill_marker(path):
     try:
-        pid = int(PID_FILE.read_text().strip())
+        pid = int(path.read_text().strip())
     except Exception:
         return False
     killed = False
-    try:
-        os.killpg(pid, signal.SIGTERM)
-        killed = True
-    except Exception:
+    for attempt in (lambda: os.killpg(pid, signal.SIGTERM),
+                    lambda: os.kill(pid, signal.SIGTERM)):
         try:
-            os.kill(pid, signal.SIGTERM)
+            attempt()
             killed = True
+            break
         except Exception:
-            pass
+            continue
     try:
-        PID_FILE.unlink()
+        path.unlink()
     except Exception:
         pass
     return killed
+
+
+def stop_playback(session=None, everywhere=False):
+    """Kill in-flight playback. Returns True if something died.
+
+    Given a session, only that session's audio stops. A single global marker
+    meant every session cut off every other one: finishing a turn in one window
+    killed the answer you were listening to in another, mid-sentence, and
+    replaced it with an unrelated one. `everywhere` is the explicit "be quiet
+    now" of `voice stop`.
+    """
+    if everywhere:
+        markers = list(RUN_DIR.glob("pid-*")) if RUN_DIR.is_dir() else []
+        markers.append(PID_FILE)
+        return any(_kill_marker(m) for m in markers)
+    return _kill_marker(pid_file(session))
 
 
 def voice_path(name):
@@ -377,7 +397,7 @@ def _is_repeat(clean_text):
     return False
 
 
-def speak_async(text, cfg=None, max_chars=None):
+def speak_async(text, cfg=None, max_chars=None, session=None):
     """Clean `text` and play it in a detached process. Returns a reason string
     if nothing was spoken, or None on success.
 
@@ -409,12 +429,13 @@ def speak_async(text, cfg=None, max_chars=None):
     if find_player() is None:
         return "no audio player found"
 
-    stop_playback()  # whatever is playing is now stale
+    stop_playback(session)  # this session's previous answer is now stale
 
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=str(RUN_DIR), suffix=".json")
     with os.fdopen(fd, "w") as fh:
-        json.dump({"text": clean, "cfg": cfg, "voice": voice, "speaker": speaker}, fh)
+        json.dump({"text": clean, "cfg": cfg, "voice": voice,
+                   "speaker": speaker, "session": session}, fh)
 
     worker = Path(__file__).resolve().parent / "voicectl.py"
     subprocess.Popen(
@@ -433,10 +454,14 @@ def run_worker(text_file):
     except OSError:
         pass
     RUN_DIR.mkdir(parents=True, exist_ok=True)
-    PID_FILE.write_text(str(os.getpid()))
+    marker = PID_FILE
     try:
         payload = json.loads(Path(text_file).read_text())
-        wav = RUN_DIR / "out.wav"
+        marker = pid_file(payload.get("session"))
+        marker.write_text(str(os.getpid()))
+        # Per session: two sessions sharing one file would overwrite each
+        # other's audio mid-playback.
+        wav = RUN_DIR / (marker.name.replace("pid-", "out-") + ".wav")
         cmd = piper_cmd(payload["voice"], payload["cfg"], wav,
                         payload.get("speaker", 0))
         proc = subprocess.run(
@@ -462,8 +487,8 @@ def run_worker(text_file):
         except Exception:
             pass
         try:
-            if PID_FILE.read_text().strip() == str(os.getpid()):
-                PID_FILE.unlink()
+            if marker.read_text().strip() == str(os.getpid()):
+                marker.unlink()
         except Exception:
             pass
 

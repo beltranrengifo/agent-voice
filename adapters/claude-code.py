@@ -40,7 +40,7 @@ def main():
         time.sleep(0.25)
 
     if text.strip():
-        vlib.speak_async(text)
+        vlib.speak_async(text, session=hook_input.get("session_id"))
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ def main():
     # changes, since the cost of being wrong here is total silence.
     text = event.get("last-assistant-message") or event.get("last_assistant_message")
     if text and text.strip():
-        vlib.speak_async(text)
+        vlib.speak_async(text, session=event.get("thread-id") or event.get("thread_id"))
 
 
 if __name__ == "__main__":
