@@ -37,6 +37,15 @@ export default Plugin.define({
     // Assistant prose per session, accumulated as it streams in.
     const buffers = new Map<string, string>()
 
+    // /voice — same subcommands as the CLI (stop, pause, on, off, speed...).
+    await ctx.command.transform((editor) => {
+      editor.add({
+        name: "voice",
+        description: "Control spoken answers: stop, pause, resume, on, off, speed, es, en",
+        execute: async () => {},
+      })
+    })
+
     void (async () => {
       try {
         for await (const event of ctx.event.subscribe({ signal: controller.signal })) {

@@ -14,18 +14,38 @@ import { spawn } from "node:child_process"
 
 const VOICE_CLI = process.env.VOICE_CLI ?? "voice"
 
-function speak(text) {
-  try {
-    const child = spawn(VOICE_CLI, ["speak"], {
-      stdio: ["pipe", "ignore", "ignore"],
-      detached: true,
-    })
-    child.on("error", () => {})
-    child.stdin.end(text)
-    child.unref()
-  } catch {
-    // Speech is a convenience; never let it disturb the session.
-  }
+function runVoice(args, input) {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(VOICE_CLI, args, {
+        stdio: [input === undefined ? "ignore" : "pipe", "ignore", "ignore"],
+        detached: input !== undefined,
+      })
+      child.on("error", () => resolve())
+      if (input !== undefined) {
+        child.stdin.end(input)
+        child.unref()
+        resolve()
+        return
+      }
+      child.on("exit", () => resolve())
+    } catch {
+      resolve()
+    }
+  })
+}
+
+const speak = (text) => runVoice(["speak"], text)
+
+/** Pull the plain text the user typed out of a command invocation. */
+function promptText(prompt) {
+  if (!prompt) return ""
+  if (typeof prompt === "string") return prompt
+  const parts = prompt.parts ?? prompt.content ?? prompt
+  if (!Array.isArray(parts)) return ""
+  return parts
+    .map((p) => (typeof p === "string" ? p : (p?.text ?? "")))
+    .join(" ")
 }
 
 export default {
@@ -34,6 +54,26 @@ export default {
     const controller = new AbortController()
     // Assistant prose per session, accumulated as it streams in.
     const buffers = new Map()
+
+    // /voice — same subcommands as the CLI (stop, pause, on, off, speed...).
+    try {
+      await ctx.command.transform((editor) => {
+        editor.add({
+          name: "voice",
+          description: "Control spoken answers: stop, pause, resume, on, off, speed, es, en",
+          execute: async ({ prompt }) => {
+            const args = promptText(prompt)
+              .replace(/^\/?voice\b/, "")
+              .trim()
+              .split(/\s+/)
+              .filter(Boolean)
+            await runVoice(args.length ? args : ["status"])
+          },
+        })
+      })
+    } catch {
+      // Older hosts may not expose command registration; speech still works.
+    }
 
     void (async () => {
       try {
