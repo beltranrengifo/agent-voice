@@ -85,12 +85,16 @@ ln -sf ~/.agent-voice/scripts/voicectl.py ~/.local/bin/voice   # optional but ha
 notify = ["python3", "/Users/YOU/.agent-voice/adapters/codex.py"]
 ```
 
-**OpenCode** (v2) — copy the plugin into place:
+**OpenCode** (v2) — one command, no file copying:
 
 ```sh
-mkdir -p ~/.config/opencode/plugin
-cp ~/.agent-voice/adapters/opencode.ts ~/.config/opencode/plugin/agent-voice.ts
+opencode plugin add github:beltranrengifo/agent-voice
 ```
+
+That fetches the package, resolves `@opencode/plugin`, and adds the entry to
+`~/.config/opencode/opencode.json`. Dropping a loose `.ts` file into
+`~/.config/opencode/plugin/` does **not** work: `opencode plugin add` accepts
+only an npm or Git specifier.
 
 The adapter targets the v2 plugin API (`@opencode/plugin` 2.x — note the scope,
 which differs from the v1 `@opencode-ai/plugin`). v2 gives plugins no way to
@@ -189,8 +193,10 @@ Add a `"player"` key if audio player autodetection guesses wrong, for example
 - Voice models are not in this repo; `voice setup` downloads them from
   Hugging Face.
 - The OpenCode adapter type-checks against `@opencode/plugin` 2.0.15 and its
-  event shapes are taken from that package, but it has not yet been run against
-  a live session — unlike the Claude Code and Codex adapters, which have.
+  event shapes are taken from that package, and `opencode plugin add` installs
+  it cleanly — but it has not yet been run against a live session, unlike the
+  Claude Code and Codex adapters. Note that `opencode plugin list` reports
+  "No plugins found" even once installed; whether that is cosmetic is unconfirmed.
 - OpenCode v1 is not supported; its plugin API differs entirely.
 
 ## License
