@@ -215,6 +215,22 @@ Add a `"player"` key if audio player autodetection guesses wrong, for example
   "No plugins found" even once installed; whether that is cosmetic is unconfirmed.
 - OpenCode v1 is not supported; its plugin API differs entirely.
 
+## Tests
+
+```sh
+./test/run.sh
+```
+
+The suite drives the real adapters against stub Piper and player binaries and
+asserts on what those binaries received, so a passing test means audio really
+would have come out. Checking that the code merely parses is not enough: every
+bug this project shipped survived exactly that kind of check.
+
+`test/mutation_check.py` keeps the suite honest. It reintroduces each bug that
+actually shipped — the answer never read, prose before a tool call lost, code
+read aloud, playback never reached, the same answer spoken twice — and fails if
+the tests stay green. A suite you have not seen go red is not evidence.
+
 ## License
 
 MIT. Piper and the voice models carry their own licenses — most voices are
