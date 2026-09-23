@@ -1,0 +1,9 @@
+{
+  "name": "claude-voice",
+  "description": "Reads Claude Code's answers aloud using Piper — fully local, offline and free. Skips code blocks, picks a Spanish or English voice automatically.",
+  "version": "0.3.0",
+  "author": {
+    "name": "belt"
+  },
+  "keywords": ["tts", "voice", "accessibility", "piper", "offline"]
+}

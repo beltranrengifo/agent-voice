@@ -1,0 +1,13 @@
+{
+  "name": "claude-voice",
+  "owner": {
+    "name": "belt"
+  },
+  "plugins": [
+    {
+      "name": "claude-voice",
+      "source": "./",
+      "description": "Reads Claude Code's answers aloud with Piper — local, offline, free."
+    }
+  ]
+}

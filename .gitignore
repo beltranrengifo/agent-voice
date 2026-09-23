@@ -1,0 +1,9 @@
+# Voice models and the Piper virtualenv live in ~/.claude/voice, never in the
+# repo — they are hundreds of megabytes and are fetched by `voice setup`.
+*.onnx
+*.onnx.json
+*.wav
+venv/
+__pycache__/
+*.pyc
+.DS_Store
