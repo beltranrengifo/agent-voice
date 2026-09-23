@@ -1,7 +1,7 @@
 {
   "name": "agent-voice",
   "description": "Your coding agent reads its answers aloud — local, offline and free, via Piper. Skips code, picks a Spanish or English voice automatically.",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "author": {
     "name": "beltranrengifo"
   },
@@ -12,5 +12,31 @@
     "piper",
     "offline",
     "agent"
-  ]
+  ],
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/adapters/claude-code.py\"",
+            "timeout": 10,
+            "statusMessage": "Reading the answer aloud..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/hush.sh\"",
+            "timeout": 5,
+            "statusMessage": "Stopping speech..."
+          }
+        ]
+      }
+    ]
+  }
 }

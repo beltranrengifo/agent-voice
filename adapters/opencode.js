@@ -36,6 +36,12 @@ function resolveCommand() {
 
 const COMMAND = resolveCommand()
 
+/** Events that can mark the end of an answer, across OpenCode versions. */
+const END_EVENTS = new Set(["session.execution.succeeded", "session.idle"])
+
+/** How long the text stream must stay quiet before we read the answer. */
+const QUIET_MS = Number(process.env.VOICE_QUIET_MS ?? 900)
+
 function runVoice(args, input) {
   return new Promise((resolve) => {
     try {
