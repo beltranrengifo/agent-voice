@@ -64,7 +64,7 @@ Restart Claude Code, then run the one-time setup, which builds a virtualenv,
 installs Piper and downloads the default voices (about 170 MB):
 
 ```
-/voice setup
+/speak setup
 ```
 
 That is all. The next answer will be spoken.
@@ -112,8 +112,9 @@ plays without blocking. That is the whole integration contract.
 
 ## Usage
 
-Inside Claude Code use `/voice`; anywhere else use the `voice` CLI. Same
-commands either way.
+Inside Claude Code use `/speak`; anywhere else use the `voice` CLI. Same
+subcommands either way. (The command is `/speak`, not `/voice`, because Claude
+Code already ships a built-in `/voice` for push-to-talk input.)
 
 | Command | Effect |
 | --- | --- |
@@ -140,7 +141,7 @@ commands either way.
 on, `pause` keeps it armed but silent, optionally for a fixed period.
 
 In Claude Code, sending any message also cuts playback immediately via a
-`UserPromptSubmit` hook, so you rarely need `/voice stop`. There is no barge-in
+`UserPromptSubmit` hook, so you rarely need `/speak stop`. There is no barge-in
 on any agent: you cannot cut the voice by speaking, only by typing.
 
 ## Choosing a voice

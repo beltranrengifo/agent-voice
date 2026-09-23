@@ -1,5 +1,5 @@
 ---
-description: Control the spoken-answer plugin (stop/pause/on/off/voice/speed/setup)
+description: Control spoken answers (stop/pause/on/off/voice/speed/setup)
 argument-hint: "[stop | pause 20m | resume | on | off | es NAME | en NAME | speaker M | speed 1.2 | voices | try NAME | test | setup | doctor]"
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/voicectl.py:*)
 ---
