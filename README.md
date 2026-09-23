@@ -200,6 +200,18 @@ already exists (so older installs keep working), otherwise
 Add a `"player"` key if audio player autodetection guesses wrong, for example
 `"player": "ffplay -nodisp -autoexit -loglevel quiet"`.
 
+## When it goes quiet
+
+Check `voice` first — speech being off looks exactly like the tool being
+broken. Every config change is recorded, so you can see what turned it off and
+when:
+
+```sh
+cat "${VOICE_HOME:-$HOME/.config/agent-voice}/run/config-changes.log"
+```
+
+Then `voice doctor` for a missing model, virtualenv or audio player.
+
 ## Limitations
 
 - One-way. No barge-in: you cannot interrupt by speaking.

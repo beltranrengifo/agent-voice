@@ -72,10 +72,37 @@ def load_config():
 
 
 def save_config(cfg):
+    """Persist the config, recording who changed what.
+
+    Speech silently turning itself off is indistinguishable from the tool
+    breaking, and tracking down which process wrote the change after the fact
+    proved impossible. So every write leaves an audit line behind.
+    """
+    before = {}
+    try:
+        before = json.loads(CONFIG_PATH.read_text())
+    except Exception:
+        pass
+
     HOME.mkdir(parents=True, exist_ok=True)
     tmp = CONFIG_PATH.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
     tmp.replace(CONFIG_PATH)
+
+    changed = {k: (before.get(k), v) for k, v in cfg.items() if before.get(k) != v}
+    if not changed:
+        return
+    try:
+        RUN_DIR.mkdir(parents=True, exist_ok=True)
+        line = "{} {} {}\n".format(
+            time.strftime("%Y-%m-%d %H:%M:%S"),
+            " ".join(sys.argv) or "?",
+            json.dumps(changed, ensure_ascii=False),
+        )
+        with open(RUN_DIR / "config-changes.log", "a") as fh:
+            fh.write(line)
+    except Exception:
+        pass
 
 
 def is_silenced(cfg):

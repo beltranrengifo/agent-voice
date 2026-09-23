@@ -1,6 +1,6 @@
 {
   "name": "agent-voice",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Your coding agent reads its answers aloud — local, offline, free.",
   "type": "module",
   "license": "MIT",

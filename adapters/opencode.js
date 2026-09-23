@@ -65,6 +65,17 @@ function runVoice(args, input) {
 
 const speak = (text) => runVoice(["speak"], text)
 
+/**
+ * Subcommands the slash command may run. Anything unrecognised falls back to
+ * reporting status: a stray word in a prompt must never be able to turn speech
+ * off behind the user's back, which is a failure that looks exactly like the
+ * tool breaking.
+ */
+const ALLOWED = new Set([
+  "status", "on", "off", "pause", "resume", "stop", "speed", "volume",
+  "max", "voices", "test", "doctor", "es", "en", "speaker", "try",
+])
+
 /** Pull the plain text the user typed out of a command invocation. */
 function promptText(prompt) {
   if (!prompt) return ""
@@ -111,7 +122,8 @@ export default {
               .trim()
               .split(/\s+/)
               .filter(Boolean)
-            await runVoice(args.length ? args : ["status"])
+            const verb = args[0]?.toLowerCase()
+            await runVoice(verb && ALLOWED.has(verb) ? args : ["status"])
           },
         })
       })
