@@ -11,13 +11,35 @@
  * Install:  opencode plugin add github:beltranrengifo/agent-voice
  */
 import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 
-const VOICE_CLI = process.env.VOICE_CLI ?? "voice"
+/**
+ * Resolve the controller without trusting PATH.
+ *
+ * OpenCode's background service runs with a minimal environment, so `voice`
+ * is typically not resolvable there even when it works in your shell. The
+ * package ships scripts/voicectl.py alongside this file, so call that through
+ * an interpreter we can name outright.
+ */
+function resolveCommand() {
+  if (process.env.VOICE_CLI) return [process.env.VOICE_CLI]
+
+  const script = fileURLToPath(new URL("../scripts/voicectl.py", import.meta.url))
+  if (existsSync(script)) {
+    for (const python of ["/usr/bin/python3", "/opt/homebrew/bin/python3", "python3"]) {
+      if (python === "python3" || existsSync(python)) return [python, script]
+    }
+  }
+  return ["voice"] // last resort: hope it is on PATH
+}
+
+const COMMAND = resolveCommand()
 
 function runVoice(args, input) {
   return new Promise((resolve) => {
     try {
-      const child = spawn(VOICE_CLI, args, {
+      const child = spawn(COMMAND[0], [...COMMAND.slice(1), ...args], {
         stdio: [input === undefined ? "ignore" : "pipe", "ignore", "ignore"],
         detached: input !== undefined,
       })
