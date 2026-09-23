@@ -525,6 +525,18 @@ def is_ready():
         problems.append(f"Piper virtualenv missing at {PIPER.parent.parent}")
     if not installed_voices():
         problems.append(f"No voice models in {VOICES_DIR}")
+    else:
+        # A configured voice whose file is absent means silence in that
+        # language, which is worse than an obvious failure: everything looks
+        # installed and answers just never get read.
+        cfg = load_config()
+        for lang in ("es", "en"):
+            name = cfg.get(f"voice_{lang}")
+            if name and not voice_path(name).exists():
+                problems.append(
+                    f"{lang} voice {name} is configured but not installed "
+                    f"(run: voice install {name})"
+                )
     if find_player() is None:
         problems.append("No audio player found (afplay/paplay/aplay/ffplay)")
     return (not problems), problems

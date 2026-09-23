@@ -132,12 +132,20 @@ def setup(args):
 
     cfg = vlib.load_config()
     cfg["enabled"] = True   # running setup is an explicit request for speech
+    installed = vlib.installed_voices()
     for lang, prefix in (("es", "es_"), ("en", "en_")):
-        if not vlib.voice_path(cfg[f"voice_{lang}"]).exists():
-            match = next((v for v in vlib.installed_voices() if v.startswith(prefix)), None)
-            if match:
-                cfg[f"voice_{lang}"] = match
-                cfg[f"speaker_{lang}"] = 0
+        if vlib.voice_path(cfg[f"voice_{lang}"]).exists():
+            continue
+        # Prefer a voice for the right language; otherwise take any installed
+        # one. Leaving a name that points at nothing means that language is
+        # silently never spoken.
+        match = next((v for v in installed if v.startswith(prefix)), None) or \
+            (installed[0] if installed else None)
+        if match:
+            cfg[f"voice_{lang}"] = match
+            cfg[f"speaker_{lang}"] = 0
+            if not match.startswith(prefix):
+                log.append(f"No {lang} voice installed; using {match} for it too.")
     vlib.save_config(cfg)
 
     ok, problems = vlib.is_ready()

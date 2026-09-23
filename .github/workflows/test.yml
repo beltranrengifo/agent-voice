@@ -1,0 +1,36 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # The suite stubs Piper and the audio player, so it needs neither a
+      # sound card nor a 60 MB download — but it still drives the real
+      # adapters and asserts on what those stubs received.
+      - name: Wiring tests
+        run: python3 test/test_wiring.py
+
+      - name: OpenCode adapter
+        run: |
+          node test/opencode-adapter.mjs
+          node test/opencode-reconnect.mjs
+
+      # A green suite proves nothing until it has been seen to fail, so every
+      # bug this project shipped is reintroduced and must be caught.
+      - name: Mutation check
+        run: python3 test/mutation_check.py
