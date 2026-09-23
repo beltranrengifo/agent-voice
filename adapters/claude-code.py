@@ -7,6 +7,7 @@ so we dig the last prose out of the session transcript.
 
 import json
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -28,7 +29,16 @@ def main():
     if not transcript:
         return
 
-    text = vlib.last_assistant_text(transcript)
+    # The hook can fire a moment before the final message reaches the
+    # transcript on disk, which reads as an empty turn. Give it a short grace
+    # period rather than silently skipping the answer.
+    text = ""
+    for attempt in range(6):
+        text = vlib.last_assistant_text(transcript)
+        if text.strip():
+            break
+        time.sleep(0.25)
+
     if text.strip():
         vlib.speak_async(text)
 
