@@ -119,28 +119,38 @@ export default {
       // Older hosts may not expose command registration; speech still works.
     }
 
+    // The event stream can drop — a service restart, a keepalive timeout — and
+    // a plugin that simply stops listening looks identical to one that works
+    // until you notice it went quiet an hour ago. Reconnect instead.
     void (async () => {
-      try {
-        for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
-          if (event.type === "session.text.delta") {
-            const { sessionID, delta } = event.data
-            if (delta) {
-              buffers.set(sessionID, (buffers.get(sessionID) ?? "") + delta)
-              clearTimeout(timers.get(sessionID))
-              timers.delete(sessionID)
+      let backoff = 1000
+      while (!controller.signal.aborted) {
+        try {
+          for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+            backoff = 1000 // a delivered event means the stream is healthy
+            if (event.type === "session.text.delta") {
+              const { sessionID, delta } = event.data
+              if (delta) {
+                buffers.set(sessionID, (buffers.get(sessionID) ?? "") + delta)
+                clearTimeout(timers.get(sessionID))
+                timers.delete(sessionID)
+              }
+              continue
             }
-            continue
+            if (END_EVENTS.has(event.type)) {
+              // A turn that uses tools ends several executions, each of which
+              // would otherwise speak its own fragment and cut off the previous
+              // one, leaving only the last paragraph audible. Wait for the
+              // stream to go quiet instead, then read the whole answer once.
+              schedule(event.data?.sessionID)
+            }
           }
-          if (END_EVENTS.has(event.type)) {
-            // A turn that uses tools ends several executions, each of which
-            // would otherwise speak its own fragment and cut off the previous
-            // one, leaving only the last paragraph audible. Wait for the
-            // stream to go quiet instead, then read the whole answer once.
-            schedule(event.data?.sessionID)
-          }
+        } catch {
+          // Torn down, or the stream failed. The loop below decides which.
         }
-      } catch {
-        // Aborted on teardown, or the stream dropped. Either way, stop quietly.
+        if (controller.signal.aborted) break
+        await new Promise((r) => setTimeout(r, backoff))
+        backoff = Math.min(backoff * 2, 30000)
       }
     })()
 

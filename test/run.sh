@@ -9,6 +9,7 @@ python3 test/test_wiring.py
 echo
 echo "== opencode adapter (node) =="
 node test/opencode-adapter.mjs
+node test/opencode-reconnect.mjs
 
 echo
 echo "== mutation check =="
